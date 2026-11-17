@@ -1,0 +1,71 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tau"
+version = "1.3.0"
+description = "TAU: a voice-first lab assistant built as an extension of OpenJarvis"
+readme = "README.md"
+# Same window as OpenJarvis (>=3.10,<3.14).
+requires-python = ">=3.10,<3.14"
+license = {text = "Apache-2.0"}
+authors = [{name = "R. Anthony Beckett"}, {name = "TAU contributors"}]
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+]
+# The core runs with no GPU and no audio hardware.
+dependencies = [
+    "openjarvis",
+    "pyyaml>=6",
+    "cryptography>=43",
+    "spake2>=0.9",            # MIT; PAKE for hub/node pairing
+    "psutil>=5.9",
+]
+
+[project.optional-dependencies]
+voice = [
+    "openwakeword>=0.4",
+    "faster-whisper>=1.0",
+    "onnxruntime>=1.17",
+    "numpy>=1.24",
+    "sounddevice>=0.5",
+    "soundfile>=0.12",
+    # Kokoro's own runtime needs. kokoro and misaki themselves are installed with
+    # --no-deps from requirements-kokoro.txt so their GPL extras never land.
+    "torch>=2.1",
+    "transformers>=4.40",
+    "huggingface-hub>=0.23",
+    "loguru>=0.7",
+    "num2words>=0.5",          # LGPL-2.1, used unmodified by misaki for numbers
+    "spacy>=3.7,<3.9",
+    "addict>=2.4",
+    "regex>=2023",
+]
+display = ["pywebview>=5"]
+windows = [
+    "pywin32>=306; sys_platform == 'win32'",
+    "winrt-Windows.UI.Notifications.Management>=2.0; sys_platform == 'win32'",
+    "winrt-Windows.UI.Notifications>=2.0; sys_platform == 'win32'",
+    "winrt-Windows.Foundation>=2.0; sys_platform == 'win32'",
+]
+gesture = ["mediapipe>=0.10", "opencv-python-headless>=4.8"]
+dev = ["pytest>=8", "playwright>=1.40"]   # Apache-2.0; the display's browser test
+
+[project.scripts]
+tau = "tau.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tau"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"profile.example.yaml" = "tau/data/profile.example.yaml"
+"reflexes.yaml" = "tau/data/reflexes.yaml"
+"banned_words.example.txt" = "tau/data/banned_words.example.txt"
+"requirements-kokoro.txt" = "tau/data/requirements-kokoro.txt"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

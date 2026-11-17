@@ -1,0 +1,148 @@
+# Reflexes: phrase patterns that run an organ action with no model call.
+#
+# Each entry: name, one or more `patterns` (Python regular expressions,
+# matched against the lower-cased words after the assistant's name), and
+# either `organ` + `action` (+ `args` filled from named groups) or `special`
+# (handled inside TAU: confirm, decline, quiet, grant, correction, ...).
+# Put your own in <TAU home>/reflexes.yaml; yours are tried first.
+# Specials come first so "stop talking" is never read as "stop the talking service".
+
+- name: self_check
+  patterns: ['^(check yourself|test yourself|run a (self[- ]?)?check|self[- ]?check|check your(self| hardware| devices))[.!]?$']
+  special: selfcheck
+
+- name: confirm
+  patterns: ['^(yes|yeah|yep|yup|do it|go ahead|sure|ok|okay|please do|confirm)( please)?[.!]?$']
+  special: confirm
+
+- name: decline
+  patterns: ['^(no|nope|don''?t|cancel|never ?mind|leave it|stop that)[.!]?$']
+  special: decline
+
+- name: quiet
+  patterns: ['^(quiet|be quiet|hush|shh+|stop talking|mute|silence|enough)[.!]?$']
+  special: quiet
+
+- name: unquiet
+  patterns: ['^(you can talk|speak up|unmute|talk to me)( again)?[.!]?$']
+  special: unquiet
+
+- name: hard_day_on
+  patterns: ['^(it''?s a |i''?m having a )?hard day( today)?[.!]?$', '^hard day mode( on)?$']
+  special: hard_day_on
+
+- name: hard_day_off
+  patterns: ['^hard day (mode )?off$', '^i''?m (ok|okay|fine|better) now[.!]?$']
+  special: hard_day_off
+
+- name: grant_act
+  patterns: ['^you can (?P<what>.+?) without asking[.!]?$']
+  special: grant
+  args: {level: act}
+
+- name: grant_sense
+  patterns: ['^you can (look at|see|watch|read|check) (?P<what>.+?)[.!]?$']
+  special: grant
+  args: {level: sense}
+
+- name: revoke
+  patterns: ['^(stop|don''?t) (?P<what>.+?) without asking[.!]?$', '^stop (looking at|watching) (?P<what>.+?)[.!]?$']
+  special: grant
+  args: {level: suggest}
+
+- name: recheck_lab
+  patterns: ['^(re-?check|re-?scan|refresh|re-?map) (the )?lab[.!]?$', '^rediscover( the lab)?$']
+  special: rediscover
+
+- name: correction
+  patterns: ['^(no,? )?(from now on|always|never|don''?t ever|please don''?t|remember that|stop calling me|call me|i prefer),? .+']
+  special: correction
+
+- name: pins
+  patterns: ['^(what''?s|show)( on)?( the)? pin(s| card| cards)?\??$', '^clear( the)? pins?$']
+  special: pins
+
+- name: connections
+  patterns: ['^what (can|could) you connect to\??$', '^show me the connections\??$', '^what connections are there\??$']
+  special: connections
+
+- name: start_model_server
+  patterns: ['^(please )?start (the|your|my) (model server|brain)[.!]?$']
+  special: start_brain
+
+- name: vram
+  patterns: ['^(what''?s|what is|how much is|how much|check) (my |the )?(vram|gpu memory|video memory|gpu)( free| left| use| usage)?\??$']
+  organ: gpu
+  action: vram
+
+- name: start_service
+  patterns: ['^start (the )?(?P<name>[\w .-]+?)( service| server)?( on (?P<machine>[\w.-]+))?$']
+  organ: services
+  action: start
+  args: {name: '{name}'}
+
+- name: stop_service
+  patterns: ['^stop (the )?(?P<name>[\w .-]+?)( service| server)?( on (?P<machine>[\w.-]+))?$']
+  organ: services
+  action: stop
+  args: {name: '{name}'}
+
+- name: restart_service
+  patterns: ['^restart (the )?(?P<name>[\w .-]+?)( service| server)?( on (?P<machine>[\w.-]+))?$']
+  organ: services
+  action: restart
+  args: {name: '{name}'}
+
+- name: is_service_up
+  patterns: ['^is (the )?(?P<name>[\w .-]+?)( service| server)? (up|running|ok|okay)\??$']
+  organ: services
+  action: status
+  args: {name: '{name}'}
+
+- name: prep_for_app
+  patterns: ['^(prep|prepare|get ready|get the machine ready|make room)( the machine)? for (?P<app>.+?)$']
+  organ: apps
+  action: prep
+  args: {app: '{app}'}
+
+- name: switch_model
+  patterns: ['^(switch|change|swap)( over)? to (the )?(?P<name>[\w .:/-]+?)( model)?$', '^use (the )?(?P<name>[\w .:/-]+?) model$']
+  organ: models
+  action: switch
+  args: {name: '{name}'}
+
+- name: which_model
+  patterns: ['^(which|what) (model|brain)( are you using| is (this|that|on|loaded))?\??$']
+  organ: models
+  action: current
+
+- name: running_on_machine
+  patterns: ['^what''?s running on (?P<machine>[\w.-]+)\??$', '^(list|show)( the| all)? services on (?P<machine>[\w.-]+)$']
+  organ: services
+  action: list
+
+- name: what_on_port
+  patterns: ['^what''?s (on|using|listening on|running on) port (?P<port>\d+)( on (?P<machine>[\w.-]+))?\??$', '^who''?s (on|using) port (?P<port>\d+)\??$']
+  organ: services
+  action: port
+  args: {port: '{port}'}
+
+- name: lab_services
+  patterns: ['^what services (does|do|are)( (the|my|our) lab| we| i)? ?(have|running|run|got)\??$', '^(list|show)( all)?( the)? (lab )?services$']
+  organ: services
+  action: list
+
+- name: notifications
+  patterns: ['^(any |show( me)? |read( me)? |what are )?(my |the )?(recent |latest |new )?notifications\??$', '^what did i miss\??$']
+  organ: notifications
+  action: recent
+
+- name: last_error
+  patterns: ['^what (failed|broke|went wrong)\??$', '^(show|read)( me)? the last error$']
+  organ: cmdfail
+  action: last_error
+
+- name: focused
+  patterns: ['^what am i (looking at|in|using)\??$']
+  organ: window
+  action: focused

@@ -1,0 +1,98 @@
+# Adding a program here is all it takes for TAU to notice its tool servers.
+# Only names and start commands are ever read from these settings files.
+- label: "Claude desktop app"
+  format: "json"
+  keys:
+    - "mcpServers"
+  paths:
+    Windows:
+      - "{APPDATA}/Claude/claude_desktop_config.json"
+    Darwin:
+      - "{HOME}/Library/Application Support/Claude/claude_desktop_config.json"
+    Linux:
+      - "{HOME}/.config/Claude/claude_desktop_config.json"
+
+- label: "Claude Code"
+  format: "json"
+  keys:
+    - "mcpServers"
+  paths:
+    Windows:
+      - "{HOME}/.claude.json"
+    Linux:
+      - "{HOME}/.claude.json"
+    Darwin:
+      - "{HOME}/.claude.json"
+
+- label: "Cursor"
+  format: "json"
+  keys:
+    - "mcpServers"
+  paths:
+    Windows:
+      - "{HOME}/.cursor/mcp.json"
+    Linux:
+      - "{HOME}/.cursor/mcp.json"
+    Darwin:
+      - "{HOME}/.cursor/mcp.json"
+
+- label: "VS Code"
+  format: "json"
+  keys:
+    - "servers"
+    - "mcpServers"
+  paths:
+    Windows:
+      - "{APPDATA}/Code/User/mcp.json"
+    Darwin:
+      - "{HOME}/Library/Application Support/Code/User/mcp.json"
+    Linux:
+      - "{HOME}/.config/Code/User/mcp.json"
+
+- label: "Gemini CLI"
+  format: "json"
+  keys:
+    - "mcpServers"
+  paths:
+    Windows:
+      - "{HOME}/.gemini/settings.json"
+    Linux:
+      - "{HOME}/.gemini/settings.json"
+    Darwin:
+      - "{HOME}/.gemini/settings.json"
+
+- label: "Codex"
+  format: "toml"
+  keys:
+    - "mcp_servers"
+  paths:
+    Windows:
+      - "{HOME}/.codex/config.toml"
+    Linux:
+      - "{HOME}/.codex/config.toml"
+    Darwin:
+      - "{HOME}/.codex/config.toml"
+
+- label: "LM Studio"
+  format: "json"
+  keys:
+    - "mcpServers"
+  paths:
+    Windows:
+      - "{HOME}/.lmstudio/mcp.json"
+    Linux:
+      - "{HOME}/.lmstudio/mcp.json"
+    Darwin:
+      - "{HOME}/.lmstudio/mcp.json"
+
+- label: "Windsurf"
+  format: "json"
+  keys:
+    - "mcpServers"
+  paths:
+    Windows:
+      - "{HOME}/.codeium/windsurf/mcp_config.json"
+    Linux:
+      - "{HOME}/.codeium/windsurf/mcp_config.json"
+    Darwin:
+      - "{HOME}/.codeium/windsurf/mcp_config.json"

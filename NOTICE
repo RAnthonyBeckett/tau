@@ -1,0 +1,12 @@
+TAU
+Copyright 2026 R. Anthony Beckett and TAU contributors
+A Frak'd-Up Media(TM) product. "Frak'd-Up Media" and its logo are trademarks
+of R. Anthony Beckett; the Apache License does not grant rights to them.
+
+TAU is an extension of OpenJarvis (https://github.com/open-jarvis/openjarvis),
+which is licensed under the Apache License, Version 2.0. TAU depends on
+OpenJarvis at runtime and does not copy its source. OpenJarvis's own NOTICE
+and LICENSE apply to OpenJarvis.
+
+The OKF format is specified by Google Cloud's knowledge-catalog project
+(Apache-2.0): https://github.com/GoogleCloudPlatform/knowledge-catalog

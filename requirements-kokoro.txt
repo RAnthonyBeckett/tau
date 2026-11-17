@@ -1,0 +1,11 @@
+# Install with:  python -m pip install --no-deps -r requirements-kokoro.txt
+# (add --ignore-requires-python on Python 3.13: kokoro and misaki declare <3.13
+#  but run on it; TAU's tests run them on 3.12.)
+#
+# --no-deps is the point: kokoro requires misaki[en], and misaki[en] pulls
+# phonemizer-fork and espeakng-loader (GPL-3.0). TAU never imports
+# kokoro.pipeline or misaki.espeak, so neither is needed. Their real runtime
+# needs are listed in tau[voice].
+kokoro==0.9.4
+misaki==0.9.4
+en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl

@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TAU</title>
+<style>
+  :root { --bg: #040203; --ink: #f3d9a4; --soft: #c9ae84; --red: #ff2a2a; --amber: #ffb547;
+    --panel: rgba(12, 5, 4, .82); --line: rgba(255, 90, 60, .38); }
+  html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden;
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); }
+  #stage { position: fixed; inset: 0; }
+  canvas { display: block; }
+  button { font: inherit; color: var(--ink); cursor: pointer; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+  /* status line: what TAU is doing right now */
+  #status { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); max-width: min(720px, 70vw);
+    padding: 7px 16px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line);
+    font-size: 16px; text-align: center; z-index: 6; }
+  #status::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+    margin-right: 9px; background: #6b4a22; vertical-align: 1px; }
+  body[data-state="listening"] #status::before { background: #fff0c0; box-shadow: 0 0 10px #ffe9a0; }
+  body[data-state="thinking"] #status::before, body[data-state="transcribing"] #status::before { background: var(--amber); }
+  body[data-state="speaking"] #status::before { background: #fff27a; box-shadow: 0 0 10px #fff27a; }
+  body[data-state="error"] #status::before { background: var(--red); }
+
+  /* top-right buttons */
+  #corner { position: fixed; top: 12px; right: 14px; display: flex; gap: 8px; z-index: 6; }
+  .chip { padding: 6px 12px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
+  .chip.glow { border-color: var(--amber); box-shadow: 0 0 12px rgba(255, 181, 71, .55); }
+  #helpbtn { width: 34px; height: 34px; padding: 0; border-radius: 50%; font-weight: 700; font-size: 17px; }
+
+  /* conversation: the last few exchanges, large readable type */
+  #convo { position: fixed; top: 64px; right: 14px; bottom: 86px; width: min(380px, 30vw);
+    overflow-y: auto; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; z-index: 5; font-size: 17px; }
+  #convo h2 { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--soft); letter-spacing: .04em; }
+  #convo .empty { color: var(--soft); font-size: 15px; }
+  .msg { margin: 0 0 12px; padding: 6px 8px; border-radius: 8px; border: 1px solid transparent; }
+  .msg .head { display: flex; align-items: center; gap: 8px; }
+  .msg .when { font-size: 14px; color: var(--soft); }
+  .msg .copy { margin-left: auto; padding: 2px 10px; border-radius: 12px; font-size: 14px;
+    background: rgba(40, 12, 8, .9); border: 1px solid var(--line); }
+  .msg .tag { display: inline-block; margin: 4px 6px 2px 0; padding: 1px 8px; border-radius: 10px; font-size: 14px;
+    border: 1px solid var(--amber); color: #ffe2b0; }
+  .msg .tag.now { background: rgba(110, 90, 30, .6); }
+  .msg.pin { border-color: rgba(255, 181, 71, .45); background: rgba(60, 30, 6, .35); }
+  .msg.speaking { border-color: #fff27a; box-shadow: 0 0 10px rgba(255, 242, 122, .25); }
+  .msg .who { display: inline-block; font-size: 14px; color: var(--soft); text-transform: uppercase; letter-spacing: .05em; }
+  .msg.you .text { color: #e9e2d6; }
+  .msg.tau .text { color: #ffd28a; }
+  .msg .text { display: block; white-space: pre-wrap; word-wrap: break-word; }
+
+  /* bottom bar: talk control and type box, always visible */
+  #bar { position: fixed; left: 14px; right: 14px; bottom: 14px; display: flex; gap: 10px; align-items: center; z-index: 6; }
+  #talk { flex: none; min-width: 120px; padding: 12px 18px; border-radius: 26px; font-size: 16px; font-weight: 600;
+    background: rgba(60, 14, 8, .92); border: 1px solid rgba(255, 120, 70, .7); }
+  #talk[data-mode="listening"] { background: rgba(110, 90, 30, .95); border-color: #ffe9a0; }
+  #talk[data-mode="speaking"] { background: rgba(90, 20, 10, .95); }
+  #talk:disabled { opacity: .55; cursor: not-allowed; }
+  #askin { flex: 1; min-width: 0; box-sizing: border-box; padding: 12px 16px; border-radius: 26px;
+    border: 1px solid rgba(255, 90, 60, .5); background: rgba(12, 4, 4, .92); color: var(--ink); font-size: 16px; }
+  #send { flex: none; padding: 12px 16px; border-radius: 26px; background: rgba(40, 12, 8, .9); border: 1px solid var(--line); }
+  #handsfree { flex: none; font-size: 15px; }
+
+  /* flash: a warning or notice, stays until dismissed */
+  #flash { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); max-width: min(620px, 80vw);
+    padding: 10px 40px 10px 16px; border-radius: 10px; background: rgba(60, 22, 6, .95);
+    border: 1px solid var(--amber); display: none; z-index: 8; font-size: 15px; }
+  #flash.warning { border-color: var(--red); background: rgba(70, 8, 6, .95); }
+  #flash button { position: absolute; top: 6px; right: 8px; background: none; border: none; font-size: 18px; }
+
+  #tip { position: fixed; pointer-events: none; padding: 6px 10px; border-radius: 6px; max-width: 320px;
+    background: rgba(20, 8, 6, .94); border: 1px solid rgba(255, 120, 60, .45);
+    color: var(--ink); display: none; z-index: 9; font-size: 14px; }
+  #tip small { display: block; color: var(--soft); }
+
+  .sheet { position: fixed; inset: 8% 10%; background: rgba(10, 4, 4, .96); border: 1px solid rgba(255, 90, 60, .4);
+    border-radius: 10px; padding: 18px 20px; overflow: auto; display: none; z-index: 10; font-size: 16px; }
+  .sheet h2 { margin: 0 0 10px; font-size: 17px; font-weight: 600; color: #ffd28a; }
+  .sheet pre { white-space: pre-wrap; background: rgba(255,255,255,.04); padding: 10px; border-radius: 6px; font-size: 15px; }
+  .sheet button { margin: 6px 8px 0 0; padding: 8px 14px; border-radius: 16px;
+    border: 1px solid rgba(255, 140, 80, .5); background: rgba(40, 12, 8, .9); }
+  #help dl { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; margin: 0 0 12px; }
+  #help dt { color: #ffd28a; font-weight: 600; }
+  #help dd { margin: 0; }
+
+
+  /* What I see: a slide-out panel at the left edge, closed by default, remembered open or closed.
+     Sections open and close like an assistant's sidebar. No numbers: the rings carry none. */
+  #sidetab { position: fixed; left: 0; top: 50%; transform: translateY(-50%); z-index: 6; writing-mode: vertical-rl;
+    padding: 14px 7px; border-radius: 0 10px 10px 0; border: 1px solid var(--line); border-left: none;
+    background: var(--panel); color: #ffd28a; font-size: 15px; font-weight: 600; letter-spacing: .04em; cursor: pointer; }
+  #sidetab:hover, #sidetab:focus-visible { background: rgba(60, 20, 8, .9); }
+  #readings { position: fixed; top: 64px; left: 0; bottom: 86px; width: min(320px, 86vw); overflow-y: auto; box-sizing: border-box;
+    padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-left: none;
+    border-radius: 0 10px 10px 0; z-index: 7; transform: translateX(-105%); transition: transform .22s ease;
+    visibility: hidden; }
+  body.side-open #readings { transform: none; visibility: visible; }
+  body.side-open #sidetab { left: min(320px, 86vw); }
+  @media (prefers-reduced-motion: reduce) { #readings { transition: none; } }
+  #readings .sidehead { display: flex; align-items: center; justify-content: space-between; margin: 0 0 6px; }
+  #readings h2 { margin: 0; font-size: 14px; font-weight: 600; color: var(--soft); letter-spacing: .04em; }
+  #sideclose { padding: 4px 10px; border-radius: 12px; border: 1px solid var(--line); background: none; font-size: 14px; }
+  #readings details { border-top: 1px solid var(--line); padding: 6px 0; }
+  #readings summary { cursor: pointer; font-weight: 600; color: #ffd28a; font-size: 15px; padding: 4px 2px; list-style: none; }
+  #readings summary::-webkit-details-marker { display: none; }
+  #readings summary::before { content: "\25B8"; display: inline-block; width: 1.1em; transition: transform .15s; }
+  #readings details[open] > summary::before { transform: rotate(90deg); }
+  #readings summary .count { color: var(--soft); font-weight: 400; margin-left: 6px; }
+  .rd { display: block; width: 100%; text-align: left; padding: 7px 6px 7px 10px; margin: 0 0 4px;
+    border: 1px solid transparent; border-left: 3px solid var(--amber); border-radius: 8px; background: none; font-size: 15px; }
+  .rd:hover, .rd.hot { border-color: var(--line); background: rgba(60, 20, 8, .5); }
+  .rd .nm { display: block; font-weight: 600; color: #ffd28a; }
+  .rd .vl { display: block; color: var(--ink); }
+  .rd.attention { border-left-color: #ff8a1a; }
+  .rd.attention .vl { color: #ffb070; }
+  .rd.dim { border-left-color: #8a6a42; }
+  .rd.empty { border-left-color: #7a5a3a; border-left-style: dashed; }
+  .rd.empty .vl { color: #e0c9a6; }
+  .rcpt { padding: 6px 6px 6px 10px; margin: 0 0 4px; border-left: 3px solid #8a6a42; font-size: 14px; }
+  .rcpt b { color: #ffd28a; font-weight: 600; }
+  .rcpt span { display: block; color: var(--soft); }
+  .sideempty { color: #e0c9a6; font-size: 14px; padding: 4px 6px; margin: 0; }
+  #proposal { position: fixed; z-index: 11; left: 50%; bottom: 96px; transform: translateX(-50%); width: min(480px, 92vw);
+    padding: 14px 16px; border-radius: 12px; background: rgba(12, 5, 4, .97); border: 1px solid var(--amber);
+    display: none; font-size: 16px; }
+  #proposal p { margin: 0 0 10px; color: #fff0c0; }
+  #proposal button { margin: 0 8px 0 0; padding: 9px 20px; border-radius: 18px; border: 1px solid rgba(255, 140, 80, .5);
+    background: rgba(40, 12, 8, .9); font-size: 15px; }
+  #proposal button.yes { border-color: var(--amber); }
+  #card { position: fixed; z-index: 10; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(460px, 90vw);
+    padding: 16px 18px; border-radius: 12px; background: rgba(12, 5, 4, .97); border: 1px solid var(--amber); display: none;
+    font-size: 16px; }
+  #card h2 { margin: 0 0 4px; font-size: 19px; color: #ffd28a; }
+  #card .big { font-size: 22px; margin: 0 0 10px; color: #fff0c0; }
+  #card p { margin: 0 0 6px; }
+  #card .said { color: #ffe2b0; border-top: 1px solid var(--line); padding-top: 8px; margin-top: 8px; }
+  #card button { margin: 10px 8px 0 0; padding: 9px 16px; border-radius: 18px; border: 1px solid rgba(255, 140, 80, .5);
+    background: rgba(40, 12, 8, .9); font-size: 15px; }
+
+  /* settings: one section at a time, same look as the rest */
+  #setbtn { font-weight: 600; }
+  #settings { position: fixed; inset: 5% 6%; display: none; z-index: 11; background: rgba(10, 4, 4, .97);
+    border: 1px solid rgba(255, 90, 60, .45); border-radius: 12px; font-size: 16px; overflow: hidden; }
+  #setnav { flex: none; width: 230px; padding: 14px 10px; border-right: 1px solid var(--line); overflow-y: auto; }
+  #setnav button { display: block; width: 100%; text-align: left; margin: 0 0 6px; padding: 10px 12px; border-radius: 8px;
+    background: rgba(40, 12, 8, .6); border: 1px solid transparent; font-size: 16px; }
+  #setnav button.on { border-color: var(--amber); background: rgba(90, 40, 10, .7); color: #ffe2b0; }
+  #setmain { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  #sethead { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  #settitle { margin: 0; font-size: 20px; font-weight: 600; color: #ffd28a; flex: 1; }
+  #setmsg { padding: 8px 18px; min-height: 22px; font-size: 16px; color: #ffe2b0; border-bottom: 1px solid var(--line); }
+  #setmsg.bad { color: #ff9a7a; }
+  #settings.busy #setrows { opacity: .6; }
+  #setrows { flex: 1; overflow-y: auto; padding: 8px 18px 18px; }
+  #setclose { padding: 8px 16px; border-radius: 16px; background: rgba(40, 12, 8, .9); border: 1px solid var(--line); }
+  .row { padding: 12px 0; border-bottom: 1px solid rgba(255, 90, 60, .14); }
+  .row .label { font-weight: 600; color: #ffd28a; margin-bottom: 6px; font-size: 16px; }
+  .row .value { color: var(--ink); white-space: pre-wrap; }
+  .row.big .value { font-size: 26px; letter-spacing: .06em; color: #fff0c0; }
+  .row .help { margin: 6px 0 0; color: var(--soft); font-size: 15px; }
+  .row button { padding: 9px 16px; border-radius: 18px; border: 1px solid rgba(255, 140, 80, .5);
+    background: rgba(40, 12, 8, .9); font-size: 15px; }
+  .row .opts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .row button.on, .row .toggle.on { border-color: var(--amber); background: rgba(110, 60, 12, .95); color: #fff0c0; }
+  .row .toggle { min-width: 80px; }
+  .row .inline { display: flex; gap: 8px; }
+  .row input { flex: 1; min-width: 0; padding: 9px 12px; border-radius: 10px; border: 1px solid rgba(255, 90, 60, .5);
+    background: rgba(12, 4, 4, .92); color: var(--ink); font-size: 16px; }
+  .row ul { list-style: none; margin: 0; padding: 0; }
+  .row li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid rgba(255, 90, 60, .1); }
+  .row li > div { flex: 1; min-width: 0; }
+  .row li b { display: block; font-weight: 600; }
+  .row li span { color: var(--soft); font-size: 15px; }
+  .row .bar { height: 16px; border-radius: 8px; background: rgba(255,255,255,.08); overflow: hidden; }
+  .row .bar span { display: block; height: 100%; background: var(--amber); }
+  #setconfirm { display: none; margin: 10px 18px; padding: 12px 16px; border: 1px solid var(--amber); border-radius: 10px;
+    background: rgba(60, 22, 6, .95); }
+  #setconfirm p { margin: 0 0 10px; }
+  #setconfirm button { padding: 9px 16px; border-radius: 18px; margin-right: 8px; border: 1px solid rgba(255, 140, 80, .5);
+    background: rgba(40, 12, 8, .9); font-size: 15px; }
+  #setconfirm button.yes { border-color: var(--amber); }
+  @media (max-width: 760px) { #settings { inset: 8px; flex-direction: column; } #setnav { width: auto; border-right: 0;
+    border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 6px; max-height: 30vh; }
+    #setnav button { width: auto; margin: 0; } }
+
+  /* connections: full-screen panel, calm and roomy */
+  #connbtn { font-weight: 600; }
+  #conn { position: fixed; inset: 10px; display: none; flex-direction: column; z-index: 12;
+    background: rgba(10, 4, 4, .98); border: 1px solid rgba(255, 90, 60, .45); border-radius: 12px;
+    font-size: 16px; overflow: hidden; box-sizing: border-box; }
+  #connhead { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  #connhead h2 { margin: 0; font-size: 20px; font-weight: 600; color: #ffd28a; flex: 1; min-width: 140px; }
+  #connhead button { padding: 8px 16px; border-radius: 16px; background: rgba(40, 12, 8, .9); border: 1px solid var(--line); font-size: 15px; }
+  #connsum { padding: 10px 18px; border-bottom: 1px solid var(--line); font-size: 15px; color: var(--soft); }
+  #connsum:empty { display: none; }
+  #connsum .sumline { margin: 0 0 4px; }
+  #connsum .sumline:last-child { margin-bottom: 0; }
+  #conntools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 18px; border-bottom: 1px solid var(--line); }
+  #connfilter { flex: 1; min-width: 180px; box-sizing: border-box; padding: 8px 12px; border-radius: 10px;
+    border: 1px solid rgba(255, 90, 60, .5); background: rgba(12, 4, 4, .92); color: var(--ink); font-size: 15px; }
+  #connonly, #connalloff { padding: 8px 14px; border-radius: 16px; border: 1px solid rgba(255, 140, 80, .5);
+    background: rgba(40, 12, 8, .9); font-size: 15px; white-space: nowrap; }
+  #connonly.on { border-color: var(--amber); background: rgba(110, 60, 12, .95); color: #fff0c0; }
+  #connmsg { padding: 8px 18px; min-height: 22px; font-size: 16px; color: #ffe2b0; border-bottom: 1px solid var(--line); }
+  #connmsg.bad { color: #ff9a7a; }
+  #connmsg:empty { display: none; }
+  #connconfirm { display: none; margin: 10px 18px; padding: 12px 16px; border: 1px solid var(--amber); border-radius: 10px;
+    background: rgba(60, 22, 6, .95); font-size: 16px; }
+  #connconfirm p { margin: 0 0 10px; color: #fff0c0; }
+  #connconfirm button { padding: 9px 16px; border-radius: 18px; margin-right: 8px; border: 1px solid rgba(255, 140, 80, .5);
+    background: rgba(40, 12, 8, .9); font-size: 15px; }
+  #connconfirm button.yes { border-color: var(--amber); background: rgba(110, 60, 12, .95); color: #fff0c0; }
+  #connbody { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 12px 18px 24px; box-sizing: border-box; }
+  #conn details { margin: 0 0 8px; }
+  #conn summary { cursor: pointer; font-weight: 600; color: #ffd28a; font-size: 16px; padding: 6px 4px; }
+  #conn details.mach { border: 1px solid rgba(255, 90, 60, .25); border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; background: rgba(20, 8, 6, .3); }
+  #conn details.mach > summary { font-size: 17px; color: #fff0c0; }
+  .machinfo { margin: 4px 0 10px; font-size: 15px; color: var(--soft); display: flex; flex-direction: column; gap: 2px; }
+  .placehead { margin: 10px 0 6px; font-size: 15px; font-weight: 600; color: #ffd28a; }
+  #conn details.kind { border-top: 1px solid rgba(255, 90, 60, .15); padding: 6px 0; }
+  #conn details.kind > summary { font-size: 16px; color: #ffd28a; }
+  #conn details.bundle { margin: 8px 0; padding: 6px 10px; border: 1px dashed rgba(255, 140, 80, .3); border-radius: 8px; }
+  #conn details.bundle > summary { font-size: 15px; color: #ffe2b0; }
+  .connrow { padding: 10px 12px; margin: 6px 0; border: 1px solid rgba(255, 90, 60, .14); border-radius: 8px; background: rgba(20, 8, 6, .2); }
+  .connrow.ison { border-color: var(--amber); background: rgba(90, 40, 10, .45); box-shadow: 0 0 8px rgba(255, 181, 71, .15); }
+  .connrow .rowhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+  .connrow .rowhead b { font-size: 16px; color: #ffd28a; word-break: break-word; }
+  .connrow .state { display: inline-block; padding: 1px 8px; border: 1px solid var(--line); border-radius: 10px; font-size: 15px; color: var(--soft); }
+  .connrow .connev { font-size: 15px; color: var(--ink); margin: 4px 0; word-break: break-word; }
+  .connrow .connsub { font-size: 15px; color: var(--soft); margin: 3px 0; word-break: break-word; }
+  .connrow .levels { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .connrow .levelbtn { padding: 6px 14px; border-radius: 16px; border: 1px solid rgba(255, 140, 80, .4);
+    background: rgba(40, 12, 8, .9); font-size: 15px; color: var(--ink); }
+  .connrow .levelbtn.on { border-color: var(--amber); background: rgba(110, 60, 12, .95); color: #fff0c0; font-weight: 600; }
+  .connlarge { padding: 12px 24px; border-radius: 20px; font-size: 17px; font-weight: 600; border: 1px solid var(--amber);
+    background: rgba(90, 40, 10, .9); color: #fff0c0; margin-top: 12px; cursor: pointer; }
+  .connmore { padding: 8px 16px; border-radius: 16px; border: 1px solid rgba(255, 140, 80, .5);
+    background: rgba(40, 12, 8, .9); font-size: 15px; margin: 8px 0; cursor: pointer; }
+  .connempty { font-size: 16px; color: var(--soft); margin: 16px 0; }
+  @media (max-width: 800px) {
+    #conn { inset: 6px; }
+    #conntools { gap: 6px; }
+    #connhead h2 { font-size: 18px; }
+  }
+
+  /* work: Add a folder, Add an app, Set up work, My work (round 6) */
+  #workbar { position: fixed; top: 58px; left: 14px; display: flex; flex-wrap: wrap; gap: 6px; z-index: 6; max-width: 46vw; }
+  #workbar .chip { font-size: 15px; }
+  #workcount:not(:empty) { margin-left: 6px; color: #ffe2b0; }
+  #ctx { position: fixed; left: 50%; transform: translateX(-50%); bottom: 64px; z-index: 6; font-size: 14px; color: var(--soft); }
+  #ctx b { color: #ffd28a; font-weight: 600; }
+  #work { position: fixed; top: 104px; bottom: 120px; right: 6%; width: min(560px, 88vw); display: none; flex-direction: column;
+    z-index: 30; background: rgb(14, 5, 5); border: 1px solid rgba(255, 90, 60, .45); border-radius: 12px; font-size: 16px; }
+  #work.open { display: flex; }
+  #workhead { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  #worktitle { flex: 1; margin: 0; font-size: 20px; font-weight: 600; color: #ffd28a; }
+  #workhead button { padding: 8px 16px; border-radius: 16px; background: rgba(40, 12, 8, .9); border: 1px solid var(--line); }
+  #workmsg { padding: 8px 16px; min-height: 22px; color: #ffe2b0; border-bottom: 1px solid var(--line); }
+  #workmsg.bad { color: #ff9a7a; }
+  #workbody { flex: 1; overflow-y: auto; padding: 10px 16px 16px; }
+  #workbody p.q { font-size: 18px; color: #fff0c0; margin: 6px 0; }
+  #workbody p.ex, #workbody .soft { color: var(--soft); font-size: 15px; }
+  #workbody button { padding: 9px 16px; border-radius: 18px; border: 1px solid rgba(255, 140, 80, .5); background: rgba(40, 12, 8, .9);
+    font-size: 15px; margin: 6px 8px 0 0; }
+  #workbody button.yes { border-color: var(--amber); background: rgba(110, 60, 12, .95); color: #fff0c0; }
+  #workbody button:focus-visible, #workbar button:focus-visible { outline: 2px solid #ffe2b0; outline-offset: 2px; }
+  #workbody input, #workbody textarea { width: 100%; box-sizing: border-box; padding: 9px 12px; border-radius: 10px;
+    border: 1px solid rgba(255, 90, 60, .5); background: rgba(12, 4, 4, .92); color: var(--ink); font-size: 16px; }
+  #workbody .item { padding: 10px 0; border-top: 1px solid rgba(255, 90, 60, .14); }
+  #workbody .item b { color: #ffd28a; font-weight: 600; }
+  #workbody .state { display: inline-block; padding: 1px 8px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; margin-left: 6px; }
+  #workbody dl { margin: 6px 0; } #workbody dt { color: #ffd28a; font-weight: 600; margin-top: 6px; } #workbody dd { margin: 0; white-space: pre-wrap; }
+  #workbody pre { white-space: pre-wrap; max-height: 30vh; overflow: auto; background: rgba(0,0,0,.35); padding: 8px; border-radius: 8px; }
+  body.popout #workbar .chip:not([data-flow="mywork"]) { display: none; }
+  body.popout #work { inset: 48px 6px 52px 6px; width: auto; }
+  body.popout #workbar { top: 6px; left: auto; right: 6px; }
+  @media (max-width: 760px) { #workbar { max-width: calc(100vw - 28px); } #work { top: 140px; left: 8px; right: 8px; bottom: 76px; width: auto; } }
+
+  @media (max-width: 760px) {
+    #convo { left: 14px; right: 14px; width: auto; top: auto; bottom: 80px; max-height: 32vh; }
+    #status { max-width: calc(100vw - 110px); left: 14px; transform: none; text-align: left; }
+  }
+  body.popout #convo, body.popout #send, body.popout #handsfree, body.popout #pinbtn, body.popout #readings,
+  body.popout #sidetab, body.popout #setbtn { display: none !important; }
+  body.popout #status { font-size: 14px; top: 6px; padding: 4px 10px; }
+  body.popout #bar { bottom: 6px; left: 6px; right: 6px; }
+  body.popout #talk { min-width: 0; padding: 7px 12px; font-size: 14px; }
+  body.popout #askin { padding: 7px 10px; font-size: 14px; }
+</style>
+</head>
+<body data-state="idle">
+<div id="stage"></div>
+<div id="status" role="status" aria-live="polite">Starting up.</div>
+<nav id="workbar" aria-label="Work">
+  <button class="chip" data-flow="folder" title="Point TAU at a project folder">Add a folder</button>
+  <button class="chip" data-flow="app" title="Connect an AI worker or app">Add an app</button>
+  <button class="chip" data-flow="setup" title="Turn a request into a job for a worker">Set up work</button>
+  <button class="chip" data-flow="mywork" title="Jobs and their results">My work<span id="workcount"></span></button>
+  <button class="chip" data-flow="check" title="Check TAU and connections (read-only)">Check TAU</button>
+  <button class="chip" id="connbtn" title="Everything TAU could connect to, all off until you switch it on">Connections</button>
+</nav>
+<div id="ctx" aria-live="polite"></div>
+<div id="corner">
+  <button id="setbtn" class="chip" title="Every setting, one section at a time">Settings</button>
+  <button id="pinbtn" class="chip" title="Pin cards: answers I keep for you">Pin cards: 0</button>
+  <button id="helpbtn" class="chip" title="What everything on this screen does" aria-label="Help">?</button>
+</div>
+<button id="sidetab" aria-controls="readings" aria-expanded="false" title="Open or close What I see">What I see</button>
+<section id="readings" aria-label="What I see">
+  <div class="sidehead"><h2>WHAT I SEE</h2><button id="sideclose">Close</button></div>
+  <details id="sec-status" open><summary>Status</summary><div id="rdlist"></div></details>
+  <details id="sec-machines" open><summary>Machines<span class="count" id="mcount"></span></summary><div id="mlist"></div></details>
+  <details id="sec-pins"><summary>Pins<span class="count" id="pcount"></span></summary><div id="plist"></div></details>
+  <details id="sec-actions" open><summary>Recent actions<span class="count" id="acount"></span></summary><div id="alist"></div></details>
+</section>
+<div id="card" role="dialog" aria-label="Details"></div>
+<div id="proposal" role="alertdialog" aria-label="A suggestion waiting for your yes"><p id="proptext"></p>
+  <button id="propyes" class="yes">Yes</button><button id="propno">No</button></div>
+<section id="convo" aria-label="Conversation"><h2>CONVERSATION</h2><div id="msgs"><p class="empty">What we say appears here.</p></div></section>
+<div id="bar">
+  <button id="talk" title="Click, then speak. Shortcut: Space">Talk</button>
+  <input id="askin" placeholder="Type to TAU and press Enter  ( / jumps here )" autocomplete="off" aria-label="Type to TAU">
+  <button id="send" title="Send what you typed">Send</button>
+  <button id="handsfree" class="chip" title="">Listen to all speech: off</button>
+</div>
+<div id="flash" role="alert"><span id="flashtext"></span><button id="flashclose" aria-label="Dismiss">&times;</button></div>
+<div id="tip"></div>
+<div id="pins" class="sheet"></div>
+<div id="notice" class="sheet"></div>
+<div id="help" class="sheet" role="dialog" aria-label="What everything does">
+  <h2>What everything on this screen does</h2>
+  <dl>
+    <dt>Status line (top middle)</dt><dd>What I'm doing right now: ready, listening, working out what you said, thinking (and with which model), speaking, or loading a model and how long it takes. After you change something, it says what changed.</dd>
+    <dt>Settings (top right)</dt><dd>Every setting, one section at a time: brain and model, what I watch, permissions, voice and hearing, names, pacing, display and lab. Changes take effect at once.</dd>
+    <dt>Connections</dt><dd>Everything I could connect to on your machines, grouped by place and kind. Everything starts off until you choose to switch it on, and a switch always asks before it changes anything.</dd>
+    <dt>Pin cards (top right)</dt><dd>Answers and fixes I've kept for you. It glows when one is waiting; click to read them.</dd>
+    <dt>?</dt><dd>Opens this help again.</dd>
+    <dt>What I see (left)</dt><dd>A panel behind the tab at the left edge. Its sections open and close: Status (every reading on the rings), Machines, Pins, and Recent actions with receipts. Click a reading for details. It stays open or closed the way you left it.</dd>
+    <dt>Rings</dt><dd>Each piece is one thing I watch, most important in the middle. Lit means fine, dim means asleep, pulsing amber means it needs a look, faint means switched off. Numbers on the rings match the list on the left; click a piece for its details card.</dd>
+    <dt>Details card</dt><dd>What a reading means, when I last checked, and buttons: Check now, Open in Settings, and Start or Stop for a service when you've allowed it.</dd>
+    <dt>Centre of the rings</dt><dd>Click it to talk, or to stop me speaking.</dd>
+    <dt>Triangle</dt><dd>My overall state. It flickers when something needs your attention.</dd>
+    <dt>Ticks along the top edge</dt><dd>One per permission ("organ"). Brighter means I'm allowed to do more. Click one to hear what it does; change them in Settings, Permissions.</dd>
+    <dt>Top corners</dt><dd>Left corner: Quiet (I stop listening and speaking). Right corner: Hard day (short, literal answers). Click to switch; they glow when on.</dd>
+    <dt>Bottom tip</dt><dd>Glows when I've kept a pin card for you. Click to open the cards.</dd>
+    <dt>Conversation (right)</dt><dd>Both sides of what we've said, with the time. Each message has a Copy button. Pin cards show inline. While I speak, the words I'm saying are marked.</dd>
+    <dt>Talk button</dt><dd>Click, then speak. I stop listening when you pause. Shortcut: Space. While I'm speaking it says Stop.</dd>
+    <dt>Type box and Send</dt><dd>Type and press Enter or click Send. The / key jumps to it.</dd>
+    <dt>Listen to all speech</dt><dd>Off unless you switch it on. It is not a wake word: when on, I treat any speech the microphone hears as talk to me. There is no working "Tau" hotword yet; use Talk or Space.</dd>
+  </dl>
+  <button id="helpok">Got it</button>
+</div>
+<div id="settings" role="dialog" aria-label="Settings">
+  <nav id="setnav" aria-label="Settings sections"></nav>
+  <div id="setmain">
+    <div id="sethead"><h2 id="settitle">Settings</h2><button id="setclose">Close</button></div>
+    <div id="setmsg" role="status" aria-live="polite"></div>
+    <div id="setconfirm" role="alertdialog"></div>
+    <div id="setrows"></div>
+  </div>
+</div>
+<div id="conn" role="dialog" aria-label="Connections" style="display:none">
+  <div id="connhead">
+    <h2>Connections</h2>
+    <button id="connlook">Look again</button>
+    <button id="connclose">Close</button>
+  </div>
+  <div id="connsum"></div>
+  <div id="conntools">
+    <input id="connfilter" placeholder="Filter by name or kind" aria-label="Filter">
+    <button id="connonly" role="switch" aria-checked="false">Show only what's on</button>
+    <button id="connalloff">Switch everything off</button>
+  </div>
+  <div id="connmsg" aria-live="polite"></div>
+  <div id="connconfirm" role="alertdialog" style="display:none"></div>
+  <div id="connbody"></div>
+</div>
+<div id="work" role="dialog" aria-label="Work" aria-modal="false">
+  <div id="workhead"><button id="workback">Back</button><h2 id="worktitle">Work</h2><button id="workclose">Close</button></div>
+  <div id="workmsg" role="status" aria-live="polite"></div>
+  <div id="workbody"></div>
+</div>
+<script src="panel.js"></script>
+<script src="work.js"></script>
+<script src="connections.js"></script>
+<script type="module" src="tau.js"></script>
+</body>
+</html>

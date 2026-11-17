@@ -1,0 +1,174 @@
+# TAU profile template.
+#
+# `tau setup` copies this file to <TAU home>/profile.yaml and replaces every
+# {{PLACEHOLDER}} with a detected value or your answer. An answer you skip
+# becomes null (the feature stays off) rather than staying a placeholder.
+# `tau doctor` refuses to start while any {{...}} is left.
+#
+# profile.yaml is git-ignored and never shipped. Secrets never go in it:
+# name the environment variable (or the .env file) instead.
+
+tau:
+  name: "{{ASSISTANT_NAME}}"          # shown on the display and used in speech; default TAU
+  wake_word: "{{WAKE_WORD}}"          # spoken name; retrain the wake model if you change it
+  wake_model: "{{WAKE_MODEL_PATH}}"   # .onnx/.tflite trained with scripts/train_wake_word.py
+  voice_name: "{{VOICE_NAME}}"        # Kokoro voice id, e.g. a Kokoro English voice
+  listen_without_wake_word: "{{LISTEN_WITHOUT_WAKE_WORD}}"   # hands-free: any speech opens the mic (off by default)
+  brain_dir: "{{BRAIN_DIR}}"          # TAU's own OKF memory folder
+  log_dir: "{{LOG_DIR}}"
+  role: "{{ROLE}}"                    # hub | node
+
+user:
+  os_user: "{{OS_USER}}"
+  name: "{{USER_NAME}}"
+  speak_to_me_as: "{{USER_FORM_OF_ADDRESS}}"
+  identity_files: "{{IDENTITY_FILES}}"  # list of your own markdown files about you
+
+machine:
+  name: "{{MACHINE_NAME}}"
+  os: "{{OS_NAME}}"
+  cpu: "{{CPU_NAME}}"
+  ram_gb: "{{RAM_GB}}"
+  gpu_name: "{{GPU_NAME}}"
+  gpu_vram_gb: "{{GPU_VRAM_GB}}"
+
+hub:
+  host: "{{HUB_HOST}}"                # the hub's LAN name or address, as nodes see it
+  port: "{{HUB_PORT}}"                # hub<->node port, LAN only
+  bind: "{{HUB_BIND_ADDRESS}}"        # address the hub listens on for nodes (a LAN address, never 0.0.0.0 unless you opt in)
+
+secrets:
+  env_file: "{{SECRETS_ENV_FILE}}"    # optional .env path; values are read, never copied here
+
+brain:
+  local:                              # optional: a model on this lab's own hardware
+    engine: "{{LOCAL_ENGINE}}"        # ollama | llamacpp | lmstudio | vllm | openai_compat
+    url: "{{LOCAL_LLM_URL}}"
+    model: "{{LOCAL_MODEL}}"
+    unload_url: "{{LOCAL_UNLOAD_URL}}"   # optional; e.g. a llama-server or Ollama endpoint that frees VRAM
+  burst:                              # optional: any cloud or router endpoint
+    url: "{{BURST_LLM_URL}}"
+    model: "{{BURST_MODEL}}"
+    api_key_env: "{{BURST_API_KEY_ENV}}"   # name of the env var holding the key
+    cloud: true
+  prefer: "{{BRAIN_PREFER}}"          # local | burst
+  gpu:
+    min_free_vram_gb: "{{MIN_FREE_VRAM_GB}}"
+    heavy_apps: "{{HEAVY_APPS}}"      # process names that, when holding the card, push TAU to burst
+
+audio:
+  mic: "{{MIC_DEVICE}}"
+  speaker: "{{SPEAKER_DEVICE}}"
+  camera: "{{CAMERA_DEVICE}}"
+
+display:
+  port: "{{DISPLAY_PORT}}"            # loopback only
+  corner: "{{DISPLAY_CORNER}}"        # top-left | top-right | bottom-left | bottom-right
+  monitor: "{{DISPLAY_MONITOR}}"      # monitor index for the pop-out window
+  size_px: 320
+
+workspaces:
+  roots: "{{WORKSPACE_ROOTS}}"        # folders TAU may read/write when an organ allows it
+
+# Organ permission levels: off | sense | suggest | act.
+# A level can also be a mapping with per-machine overrides:
+#   services: {default: sense, machines: {some-machine: act}}
+organs:
+  voice: act
+  display: act
+  chat: act
+  services: sense
+  notifications: sense
+  gpu: "off"
+  window: "off"
+  processes: "off"
+  heartbeat: "off"
+  cmdfail: "off"
+  drives: "off"
+  appbridge: "off"
+  models: "off"
+  apps: "off"
+  handoff: "off"
+  work: "suggest"          # send work to connected AI workers; each send needs your yes (Send)
+  clipboard: "off"
+  files: "off"
+  knowledge: "off"
+  gesture: "off"
+
+allow:
+  commands: "{{ALLOWED_COMMANDS}}"    # glob patterns of commands organs may run
+  paths: "{{ALLOWED_PATHS}}"          # folders organs may touch (defaults to workspaces.roots)
+
+drives:
+  never_walk: "{{SLOW_OR_NETWORK_DRIVES}}"   # filled by discovery; TAU never walks these
+
+# User-defined services. Discovery lists what exists; you add the ones TAU may start/stop.
+services: "{{SERVICES}}"
+#  - name: my-model-server
+#    machine: some-machine
+#    start: "command to start"
+#    stop: "command to stop"
+#    health_url: "http://127.0.0.1:PORT/health"
+#    gpu_user: true
+#    importance: 2                     # 1 = most important (innermost ring)
+
+# App-prep recipes: "Tau, prep for <app>".
+app_prep: "{{APP_PREP}}"
+#  - app: some-heavy-app
+#    evict: [my-model-server]          # services that use the GPU and must stop first
+#    lane: burst                       # brain lane to use while the app runs
+#    launch: "command to start the app"
+
+models: "{{MODEL_CHOICES}}"
+#  - name: small
+#    lane: local
+#    model: some-model-id
+
+handoff:
+  default: "{{HANDOFF_DEFAULT}}"      # claude_code | codex | generic | openrig
+  adapters:
+    claude_code: {template: "{{CLAUDE_CODE_TEMPLATE}}"}
+    codex: {template: "{{CODEX_TEMPLATE}}"}
+    generic: {template: "{{GENERIC_AGENT_TEMPLATE}}"}
+    openrig: {template: "{{OPENRIG_TEMPLATE}}"}
+
+# Work (1.3): folders, workers and jobs are added from the display and saved in <TAU home>/state/work.json.
+# house_rules: extra rule files sent with every job, for example your own standing rules.
+work:
+  house_rules: []
+
+app_bridges: "{{APP_BRIDGES}}"
+#  - name: example
+#    kind: http_json
+#    url: "http://127.0.0.1:PORT/status"
+
+knowledge:
+  okf_folders: "{{OKF_FOLDERS}}"
+  fts_folders: "{{FTS_FOLDERS}}"      # opt-in per folder
+  mcp_servers: "{{MCP_SERVERS}}"      # [{name, command: [...]}]
+  use_openjarvis_memory: true
+
+style:
+  banned_words_file: "{{BANNED_WORDS_FILE}}"
+
+# Communication and pacing profile (off by default; offered at first run).
+# Only these neutral rules ever reach a model. Your reasons live in
+# <brain_dir>/private/pacing_reasons.md and are never sent anywhere.
+pacing:
+  enabled: false
+  max_paragraphs: 3
+  max_sentences: null
+  lists_allowed: true
+  answer_first: true
+  one_thing_per_reply: false
+  restate_on_resume: false
+  sparse_numbers: false
+  announce_before_touching: false
+  never_assume_finished: false
+  never_push_next_step: false
+  hard_day: false
+  overwhelm_signals: []               # e.g. ["ALL CAPS", "swearing"] in your own words
+  cloud_choice: null                  # keep | local_only | off  (recorded when asked)
+
+network:
+  lan_opt_in: []                      # services allowed to listen beyond loopback

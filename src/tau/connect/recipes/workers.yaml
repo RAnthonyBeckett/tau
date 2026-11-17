@@ -1,0 +1,15 @@
+# Assistant programs TAU can hand work to when their command is present.
+# Adding an entry here is all it takes for TAU to notice it.
+- command: claude
+  label: "Claude Code"
+- command: codex
+  label: "Codex"
+- command: rig
+  label: "OpenRig"
+  tool_server: ["mcp", "serve"]
+- command: gemini
+  label: "Gemini CLI"
+- command: aider
+  label: "Aider"
+- command: opencode
+  label: "OpenCode"
